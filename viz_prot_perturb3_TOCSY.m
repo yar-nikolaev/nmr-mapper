@@ -1,6 +1,7 @@
 function viz_prot_perturb3_TOCSY()
 
 % TODO:
+% - Re-load / re-save -- so that d n have to re-read each time?
 % - Automatically? find out which expnos used for the mapper?!? (Is this possible?)
 
 % Versions:
@@ -20,7 +21,7 @@ function viz_prot_perturb3_TOCSY()
 %   - uses folder-namespace for '+lib'; (instead of genpath...)
 %   - Testing with SLH datasets.
 
-% viz_prot_perturb3_TOCSY -- quick-n-dirty test for TOCSY data.
+% viz_prot_perturb3b_TOCSY -- quick-n-dirty test for TOCSY data.
 
 %% Settings
 %=================================
@@ -37,8 +38,13 @@ flag_load_assignments = 1;
 % 3 (CSP+intens) - forces plotting only of the first dataset!
 optns.yaxis = 3; % 1-CSP; 2-intensity; 3-both
 
+% This kinda overrides the optns.yaxis
+flag_mapper_vs_cara_select = 1; % 0 - all, 1 - only CSP; 2 - only intensity
+
+f_TOCSY_figure_fixes = 1;
+
 % Switching X-Axis data
-xaxis = 3; % 1 - spectrum id; 2 - time; 3 - 31P(RNA)
+xaxis = 1; % 1 - spectrum id; 2 - time; 3 - 31P(RNA)
 
 %%% Selecting subsets (if have a list of sets defined, but want to plot
 %%% only a few):
@@ -47,7 +53,7 @@ xaxis = 3; % 1 - spectrum id; 2 - time; 3 - 31P(RNA)
 
 % select_residues = [39 5 19 27 30 35 65 5 19 27 30 35 65 5 19 27 30 35 65 5 19 27 30 35];
 % select_residues = [1:57 59:61];
-% select_residues = [1:10];
+select_residues = [1:5 7:12 15:16];
 
 % "select_spectra" - in reverse - QnD solution to fix nc_proc
 % drop_timepoints = [2 3 6];
@@ -60,7 +66,7 @@ optns.colors = [...
         [1, 0, 0]; % red
         [0, 0.9, 0]; % green        
         ];
-
+        
 if any(optns.yaxis == [2 3]) % If plotting intensity or both
     optns.normalize_intensity = 1; 
 end;
@@ -337,9 +343,9 @@ end;
 %% Visualization
 %=================================
 optns.plotLW = 2;
-optns.plotSym = '-';
-optns.markerSize = 4;
-optns.same_min_xscale = 1;
+optns.plotSym = '-o';
+optns.markerSize = 8;
+optns.same_min_xscale = 0;
 optns.legend = dset_names;
 
 % Select what is plotted.
@@ -361,7 +367,7 @@ switch optns.yaxis
     %     traj_select{2} = assign{1}.traj_HNcsp;
         traj_select{2} = assign{1}.intens;    
 
-        n_sets = 2;    
+        n_sets = 2;
         optns.legend = cellfun(@(x) strcat(optns.legend{1}, x), {': CSP', ': int'}, 'un', 0)';
 
         % Scale intensities such that they'd show normalized:
@@ -403,37 +409,13 @@ optns.plotLW{2} = 1;
 
 % fprintf('\n= Prepare traj: %.2f s\n', toc); tic;
 
-%% Filter residues and/or time-points
-%==========================================
-% Select only subset of residues -- works only for TRAJECTORIES at the
-% moment!
-if exist('select_residues','var') && ~isempty(select_residues)
-    %%% Use IDS if the peaklist had them defined
-    %%% otherwise just peak numbers "as is"
-    if isfield(assign{1},'ids')
-        [~, idx] = ismember(select_residues, assign{1}.ids);        
-    else
-        idx = select_residues;
-    end;
+if f_TOCSY_figure_fixes
+    optns.yaxis_label = 'normalized CSP [-]';
+    optns.xaxis_label = 'titration points';
+end
     
-    optns.titles = optns.titles( idx );
-    traj_select = cellfun(@(x) x(idx,:), traj_select, 'unif', 0);    
-end
-
-if exist('drop_timepoints','var') && ~isempty(drop_timepoints)
-    % TODO - vectorize this
-    for iSet = 1:n_sets
-        traj_select{iSet}(:,drop_timepoints) = [];
-        optns.xaxis{iSet}(drop_timepoints) = [];
-    end;
-end
-
-% fprintf('\n= Filter traj: %.2f s\n', toc); tic;
-
-
-%%% Quick-and-dirty overlay
+%%% Quick-and-dirty overlay -- MOVED to BEFORE RESIDUE-SELECTION!!!
 %=================================================
-flag_mapper_vs_cara_select = 1; % 0 - all, 1 - only CSP; 2 - only intensity
 % First spectrum was sfhmqc, second - hsqcetgpsi (removes t1 noise from
 % strong ATP signals). For mapper first spectrum was not used - so better
 % drop it from manual analysis when comparing mapper vs cara-manual.
@@ -460,8 +442,10 @@ if flag_import_and_overlay_cara_manual_tracking
         % Just dropping first point here (after CSP calc):
 %         fl.HN_csp = sqrt( ( fl.H_csp.^2+(fl.N_csp./5).^2 )./2 );
         fl.HH_csp = sqrt( ( fl.H_csp.^2+(fl.N_csp./5).^2 )./2 );
-        traj_select{3} = fl.HN_csp(:,2:end);
-        traj_select{4} = fl.amp(:,2:end);
+%         traj_select{3} = fl.HN_csp(:,2:end);
+%         traj_select{4} = fl.amp(:,2:end);
+        traj_select{3} = fl.HN_csp(:,1:end);
+        traj_select{4} = fl.amp(:,1:end);
     end       
 
     % Scale intensities such that they'd show normalized (done same above
@@ -477,7 +461,7 @@ if flag_import_and_overlay_cara_manual_tracking
 end;
 
 % This comes together with the above -- not sure what this does?!
-if flag_mapper_vs_cara_select
+if flag_mapper_vs_cara_select && flag_import_and_overlay_cara_manual_tracking
     if flag_mapper_vs_cara_select==1
         drop_sets = [2 4];
     elseif flag_mapper_vs_cara_select==2
@@ -489,6 +473,34 @@ if flag_mapper_vs_cara_select
     optns.plotSym(drop_sets) = [];
     optns.legend(drop_sets) = [];
 end;
+
+
+%% Filter residues and/or time-points
+%==========================================
+% Select only subset of residues -- works only for TRAJECTORIES at the
+% moment!
+if exist('select_residues','var') && ~isempty(select_residues)
+    %%% Use IDS if the peaklist had them defined
+    %%% otherwise just peak numbers "as is"
+    if isfield(assign{1},'ids')
+        [~, idx] = ismember(select_residues, assign{1}.ids);        
+    else
+        idx = select_residues;
+    end;
+    
+    optns.titles = optns.titles( idx );
+    traj_select = cellfun(@(x) x(idx,:), traj_select, 'unif', 0);    
+end
+
+if exist('drop_timepoints','var') && ~isempty(drop_timepoints)
+    % TODO - vectorize this
+    for iSet = 1:n_sets
+        traj_select{iSet}(:,drop_timepoints) = [];
+        optns.xaxis{iSet}(drop_timepoints) = [];
+    end;
+end
+
+% fprintf('\n= Filter traj: %.2f s\n', toc); tic;
 
 
 %% Run Kd fits
